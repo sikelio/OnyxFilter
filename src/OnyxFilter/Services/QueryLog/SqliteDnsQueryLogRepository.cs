@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using OnyxFilter.Services.DnsForwarding;
 
 namespace OnyxFilter.Services.QueryLog;
 
@@ -154,31 +157,57 @@ public sealed class SqliteDnsQueryLogRepository : IDnsQueryLogRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<DnsQueryLogRecord>> QueryPageAsync(int skip, int take, string? searchText, QueryLogReason? reason, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DnsQueryLogRecord>> QueryPageAsync(
+        int skip,
+        int take,
+        string? searchText,
+        IReadOnlyList<string> clientIdentifiers,
+        QueryLogReason? reason,
+        CancellationToken cancellationToken
+    )
     {
-        List<DnsQueryLogRecord> results = new List<DnsQueryLogRecord>(take);
+        List<DnsQueryLogRecord> results = new(take);
 
-        await using SqliteConnection connection = new SqliteConnection(connectionString);
+        await using SqliteConnection connection = new(connectionString);
         await connection.OpenAsync(cancellationToken);
-
         await using SqliteCommand command = connection.CreateCommand();
 
-        System.Text.StringBuilder sql = new System.Text.StringBuilder();
-        sql.Append($"SELECT Id, TimestampTicks, ClientKey, Domain, QueryType, UpstreamServer, ProcessingTimeMs, Reason, ReasonDetail FROM {TableName} WHERE 1=1");
+        StringBuilder sql = new();
+
+        sql.Append(
+            $"SELECT Id, TimestampTicks, ClientKey, Domain, QueryType, UpstreamServer, ProcessingTimeMs, Reason, ReasonDetail FROM {TableName} WHERE 1=1"
+        );
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            sql.Append(" AND (Domain LIKE $search OR ClientKey LIKE $search)");
+            if (clientIdentifiers.Count > 0)
+            {
+                connection.CreateFunction<string, bool>(
+                    "onyx_client_matches",
+                    clientKey => IPAddress.TryParse(clientKey, out IPAddress? address)
+                                 && ClientIdentifierMatcher.MatchesAny(address, clientIdentifiers),
+                    isDeterministic: true
+                );
+
+                sql.Append(" AND (Domain LIKE $search OR ClientKey LIKE $search OR onyx_client_matches(ClientKey))");
+            }
+            else
+            {
+                sql.Append(" AND (Domain LIKE $search OR ClientKey LIKE $search)");
+            }
+
             command.Parameters.AddWithValue("$search", "%" + searchText.Trim() + "%");
         }
 
         if (reason.HasValue)
         {
             sql.Append(" AND Reason = $reason");
+
             command.Parameters.AddWithValue("$reason", reason.Value.ToString());
         }
 
         sql.Append(" ORDER BY TimestampTicks DESC, Id DESC LIMIT $take OFFSET $skip;");
+
         command.Parameters.AddWithValue("$take", take);
         command.Parameters.AddWithValue("$skip", skip);
         command.CommandText = sql.ToString();
@@ -198,7 +227,9 @@ public sealed class SqliteDnsQueryLogRepository : IDnsQueryLogRepository
                 QueryType = reader.GetString(4),
                 UpstreamServer = reader.IsDBNull(5) ? null : reader.GetString(5),
                 ProcessingTimeMs = reader.GetInt64(6),
-                Reason = Enum.TryParse(reasonText, out QueryLogReason parsedReason) ? parsedReason : QueryLogReason.Resolved,
+                Reason = Enum.TryParse(reasonText, out QueryLogReason parsedReason)
+                    ? parsedReason
+                    : QueryLogReason.Resolved,
                 ReasonDetail = reader.IsDBNull(8) ? null : reader.GetString(8),
             });
         }

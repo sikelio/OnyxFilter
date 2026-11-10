@@ -220,7 +220,13 @@ public sealed class DnsQueryLogService : IDnsQueryLogService, IDisposable
         return true;
     }
 
-    public async Task<IReadOnlyList<DnsQueryLogRecord>> GetPageAsync(int skip, int take, string? searchText, QueryLogReason? reason, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DnsQueryLogRecord>> GetPageAsync(
+        int skip,
+        int take,
+        string? searchText,
+        QueryLogReason? reason,
+        CancellationToken cancellationToken
+    )
     {
         if (skip < 0)
         {
@@ -234,12 +240,22 @@ public sealed class DnsQueryLogService : IDnsQueryLogService, IDisposable
 
         try
         {
-            return await repository.QueryPageAsync(skip, take, searchText, reason, cancellationToken);
+            IReadOnlyList<string> clientIdentifiers = await FindClientIdentifiersByNameAsync(searchText);
+
+            return await repository.QueryPageAsync(
+                skip,
+                take,
+                searchText,
+                clientIdentifiers,
+                reason,
+                cancellationToken
+            );
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Impossible de lire le journal des requêtes DNS en base.");
-            return Array.Empty<DnsQueryLogRecord>();
+
+            return [];
         }
     }
 
@@ -665,6 +681,24 @@ public sealed class DnsQueryLogService : IDnsQueryLogService, IDisposable
         {
             logger.LogError(ex, "Impossible de charger la configuration du journal des requêtes DNS.");
         }
+    }
+    
+    private async Task<IReadOnlyList<string>> FindClientIdentifiersByNameAsync(string? searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return [];
+        }
+
+        string term = searchText.Trim();
+
+        AppLocalSettings settings = await settingsStore.LoadAsync();
+
+        return settings.Clients.Clients
+            .Where(client => !string.IsNullOrWhiteSpace(client.Name)
+                             && client.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(client => client.Identifiers)
+            .ToList();
     }
 
     public void Dispose()

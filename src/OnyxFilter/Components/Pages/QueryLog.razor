@@ -47,7 +47,13 @@ else if (!IsDatabaseHealthy)
     <div class="log-toolbar">
         <div class="log-search">
             <Icon Name="search" />
-            <input type="search" class="form-control" placeholder="@L["Filtrer par domaine ou client"]" aria-label="@L["Filtrer par domaine ou client"]" value="@SearchText" @oninput="OnSearchChanged" />
+
+            <input type="search"
+                   class="form-control"
+                   placeholder="@L["Filtrer par domaine ou client"]"
+                   aria-label="@L["Filtrer par domaine ou client"]"
+                   value="@SearchText"
+                   @oninput="OnSearchChanged" />
         </div>
 
         <select class="form-select log-filter" aria-label="@L["Filtrer par décision"]" @onchange="OnStatusFilterChanged">

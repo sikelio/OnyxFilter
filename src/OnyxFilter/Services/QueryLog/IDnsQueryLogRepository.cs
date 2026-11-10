@@ -19,7 +19,14 @@ public interface IDnsQueryLogRepository
     // mémoire dans son intégralité), pour rester léger quel que soit le volume du journal.
     // searchText : filtre LIKE sur Domain et ClientKey (null = pas de filtre).
     // reason     : filtre sur la raison précise (null = toutes les requêtes).
-    Task<IReadOnlyList<DnsQueryLogRecord>> QueryPageAsync(int skip, int take, string? searchText, QueryLogReason? reason, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DnsQueryLogRecord>> QueryPageAsync(
+        int skip,
+        int take,
+        string? searchText,
+        IReadOnlyList<string> clientIdentifiers,
+        QueryLogReason? reason,
+        CancellationToken cancellationToken
+    );
 
     // Supprime les lignes plus anciennes que la limite de rétention configurée.
     Task DeleteOlderThanAsync(DateTime cutoffUtc, CancellationToken cancellationToken);
