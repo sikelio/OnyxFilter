@@ -111,4 +111,13 @@ public static class ClientIdentifierMatcher
 
         return null;
     }
+    
+    public static string? FindClientName(string clientKey, IReadOnlyList<PersistentClientEntry> clients)
+    {
+        string? name = FindClient(clientKey, clients)?.Name;
+
+        return string.IsNullOrWhiteSpace(name)
+            ? null
+            : name.Trim();
+    }
 }

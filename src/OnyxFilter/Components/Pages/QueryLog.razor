@@ -94,18 +94,31 @@ else if (!IsDatabaseHealthy)
                         <th scope="col" class="col-client">@L["Client"]</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     @foreach (DnsQueryLogRecord entry in Entries)
                     {
                         <tr class="@GetRowClass(entry.Reason)">
                             <td class="col-time">
-                                <span class="log-time">@entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</span>
-                                <span class="log-secondary">@entry.TimestampUtc.ToLocalTime().ToString("d")</span>
+                                <span class="log-time">
+                                    @entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")
+                                </span>
+
+                                <span class="log-secondary">
+                                    @entry.TimestampUtc.ToLocalTime().ToString("d")
+                                </span>
                             </td>
+
                             <td>
-                                <span class="log-domain">@entry.Domain</span>
-                                <span class="log-type">@entry.QueryType</span>
+                                <span class="log-domain">
+                                    @entry.Domain
+                                </span>
+                                
+                                <span class="log-type">
+                                    @entry.QueryType
+                                </span>
                             </td>
+
                             <td class="col-status">
                                 @switch (entry.Reason)
                                 {
@@ -133,28 +146,69 @@ else if (!IsDatabaseHealthy)
                                     case QueryLogReason.Cached:
                                         <span class="log-status log-status-muted">@L["Cache"]</span>
                                         break;
+                                    case QueryLogReason.Resolved:
                                     default:
                                         <span class="log-status log-status-ok">@L["Résolue"]</span>
                                         break;
                                 }
+
                                 <span class="log-secondary">
                                     @if (!string.IsNullOrEmpty(entry.ReasonDetail))
                                     {
-                                        <span class="log-reason" title="@entry.ReasonDetail">@entry.ReasonDetail</span>
+                                        <span class="log-reason" 
+                                              title="@entry.ReasonDetail">
+                                            @entry.ReasonDetail
+                                        </span>
                                     }
-                                    <span class="log-ms">@entry.ProcessingTimeMs ms</span>
+
+                                    <span class="log-ms">
+                                        @entry.ProcessingTimeMs ms
+                                    </span>
                                 </span>
                             </td>
+
                             <td class="col-client log-client">
-                                @{ ClientLocation? location = ClientLocationService.Lookup(entry.ClientKey); }
-                                @if (location is not null)
-                                {
-                                    <span class="client-flag" title="@location.CountryCode" aria-label="@location.CountryCode">@location.Flag</span>
+                                @{
+                                    ClientLocation? location = ClientLocationService.Lookup(entry.ClientKey);
+
+                                    string? clientName = ClientNameOf(entry.ClientKey);
                                 }
-                                @entry.ClientKey
+
                                 @if (location is not null)
                                 {
-                                    <span class="log-secondary"><span title="AS@(location.Asn) — @location.Description">@(location.CountryCode.Length == 0 ? "" : location.CountryCode + " · ")@location.Provider</span></span>
+                                    <span class="client-flag"
+                                          title="@location.CountryCode"
+                                          aria-label="@location.CountryCode">
+                                        @location.Flag
+                                    </span>
+                                }
+                                
+                                @if (clientName is not null)
+                                {
+                                    <span class="log-client-name"
+                                          title="@clientName (@entry.ClientKey)">
+                                        @clientName
+                                    </span>
+                                }
+                                else
+                                {
+                                    @entry.ClientKey
+                                }
+                                
+                                @if (location is not null || clientName is not null)
+                                {
+                                    <span class="log-secondary">
+                                        @if (clientName is not null)
+                                        {
+                                            <span>@entry.ClientKey</span>
+                                        }
+                                        @if (location is not null)
+                                        {
+                                            <span title="AS@(location.Asn) — @location.Description">
+                                                @(location.CountryCode.Length == 0 ? "" : location.CountryCode + " · ")@location.Provider
+                                            </span>
+                                        }
+                                    </span>
                                 }
                             </td>
                         </tr>

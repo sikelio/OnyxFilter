@@ -4,6 +4,9 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
+using OnyxFilter.Models.Settings;
+using OnyxFilter.Services;
+using OnyxFilter.Services.DnsForwarding;
 using OnyxFilter.Services.ClientLocation;
 using OnyxFilter.Services.QueryLog;
 
@@ -20,6 +23,10 @@ public partial class QueryLog : ComponentBase, IDisposable
 
     [Inject]
     public IClientLocationService ClientLocationService { get; set; } = default!;
+    
+    [Inject] public ILocalSettingsStore SettingsStore { get; set; } = null!;
+
+    private IReadOnlyList<PersistentClientEntry> PersistentClients { get; set; } = [];
 
     private List<DnsQueryLogRecord> Entries { get; set; } = new List<DnsQueryLogRecord>();
 
@@ -55,6 +62,10 @@ public partial class QueryLog : ComponentBase, IDisposable
     // suppression du composant (Dispose) pour ne pas laisser de tâche d'arrière-plan orpheline par
     // circuit Blazor Server.
     private CancellationTokenSource? autoRefreshCts;
+    
+    private Dictionary<string, string> clientNames = new(StringComparer.Ordinal);
+
+    private bool isDisposed;
 
     // Première et dernière requête affichées sur la page courante (1-based), pour donner un repère utile
     // à l'utilisateur en l'absence de nombre total de pages.
@@ -75,7 +86,11 @@ public partial class QueryLog : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        PersistentClients = (await SettingsStore.LoadAsync()).Clients.Clients;
+
         await LoadPageAsync();
+
+        SettingsStore.SettingsChanged += OnSettingsChanged;
     }
 
     private async Task LoadPageAsync()
@@ -100,6 +115,8 @@ public partial class QueryLog : ComponentBase, IDisposable
         {
             Entries.Add(page[i]);
         }
+
+        RebuildClientNames();
 
         IsLoading = false;
     }
@@ -238,9 +255,58 @@ public partial class QueryLog : ComponentBase, IDisposable
 
         _ => string.Empty,
     };
+    
+    private string? ClientNameOf(string clientKey) => clientNames.GetValueOrDefault(clientKey);
+
+    private bool RebuildClientNames()
+    {
+        Dictionary<string, string> names = new(StringComparer.Ordinal);
+
+        foreach (DnsQueryLogRecord entry in Entries)
+        {
+            if (
+                !names.ContainsKey(entry.ClientKey)
+                && ClientIdentifierMatcher.FindClientName(entry.ClientKey, PersistentClients) is string name
+            )
+            {
+                names[entry.ClientKey] = name;
+            }
+        }
+        
+        bool changed = names.Count != clientNames.Count
+                       || names.Any(pair => !clientNames.TryGetValue(pair.Key, out string? old) || old != pair.Value);
+
+        clientNames = names;
+
+        return changed;
+    }
+    
+    private void OnSettingsChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (isDisposed)
+            {
+                return;
+            }
+
+            PersistentClients = (await SettingsStore.LoadAsync()).Clients.Clients;
+
+            if (isDisposed || !RebuildClientNames())
+            {
+                return;
+            }
+
+            StateHasChanged();
+        });
+    }
 
     public void Dispose()
     {
+        isDisposed = true;
+
+        SettingsStore.SettingsChanged -= OnSettingsChanged;
+
         StopAutoRefresh();
     }
 }

@@ -96,6 +96,12 @@
     word-break: break-all;
 }
 
+.log-client-name {
+    font-family: var(--of-font);
+    font-weight: 500;
+    color: var(--of-text);
+}
+
 .log-type {
     display: inline-block;
     margin-left: 0.45rem;
