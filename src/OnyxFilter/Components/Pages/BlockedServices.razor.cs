@@ -64,6 +64,20 @@ public partial class BlockedServices : ComponentBase
         Schedule = settings.BlockedServices.Schedule;
     }
 
+    private async Task ReloadBlockedServiceIdsAsync()
+    {
+        try
+        {
+            AppLocalSettings settings = await SettingsStore.LoadAsync();
+
+            BlockedServiceIds = new HashSet<string>(settings.BlockedServices.BlockedServiceIds, StringComparer.Ordinal);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show(L["Erreur lors de l'enregistrement : {0}", ex.Message], ToastSeverity.Error);
+        }
+    }
+
     private IEnumerable<(string Id, string Label, IReadOnlyList<BlockedServiceDefinition> Services)> GroupedServices
     {
         get
@@ -176,6 +190,8 @@ public partial class BlockedServices : ComponentBase
         catch (Exception ex)
         {
             ToastService.Show(L["Erreur lors de l'enregistrement : {0}", ex.Message], ToastSeverity.Error);
+
+            await ReloadBlockedServiceIdsAsync();
         }
     }
 
