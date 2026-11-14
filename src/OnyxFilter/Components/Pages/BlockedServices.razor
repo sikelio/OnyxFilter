@@ -24,8 +24,8 @@
             <header class="service-group-head">
                 <h2 class="service-group-title">@L[group.Label] <span class="service-group-count">@group.Services.Count</span></h2>
                 <div class="service-group-actions">
-                    <button type="button" class="btn btn-link btn-sm" disabled="@IsGroupFullyAllowed(group.Id)" @onclick="() => UnblockAllInGroup(group.Id, group.Label)">@L["Tout autoriser"]</button>
-                    <button type="button" class="btn btn-link btn-sm text-danger" disabled="@IsGroupFullyBlocked(group.Id)" @onclick="() => BlockAllInGroup(group.Id, group.Label)">@L["Tout bloquer"]</button>
+                    <button type="button" class="btn btn-link btn-sm" disabled="@IsGroupFullyAllowed(group.Services)" @onclick="() => UnblockAllInGroup(group.Services, group.Label)">@L["Tout autoriser"]</button>
+                    <button type="button" class="btn btn-link btn-sm text-danger" disabled="@IsGroupFullyBlocked(group.Services)" @onclick="() => BlockAllInGroup(group.Services, group.Label)">@L["Tout bloquer"]</button>
                 </div>
             </header>
 

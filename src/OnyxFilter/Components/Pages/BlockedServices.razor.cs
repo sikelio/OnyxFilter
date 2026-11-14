@@ -46,16 +46,11 @@ public partial class BlockedServices : ComponentBase
 
     private bool AreAllAllowed => Catalog.All.All(s => !IsBlocked(s.Id));
 
-    private IEnumerable<BlockedServiceDefinition> ServicesInGroup(string groupId)
-    {
-        return Catalog.All.Where(s => string.Equals(s.Group, groupId, StringComparison.Ordinal));
-    }
+    private bool IsGroupFullyBlocked(IReadOnlyList<BlockedServiceDefinition> services)
+        => services.All(s => IsBlocked(s.Id));
 
-    private bool IsGroupFullyBlocked(string groupId)
-        => ServicesInGroup(groupId).All(s => IsBlocked(s.Id));
-
-    private bool IsGroupFullyAllowed(string groupId)
-        => ServicesInGroup(groupId).All(s => !IsBlocked(s.Id));
+    private bool IsGroupFullyAllowed(IReadOnlyList<BlockedServiceDefinition> services)
+        => services.All(s => !IsBlocked(s.Id));
 
     protected override async Task OnInitializedAsync()
     {
@@ -147,14 +142,14 @@ public partial class BlockedServices : ComponentBase
         await SaveAsync(L["Tous les services sont autorisés."]);
     }
 
-    private async Task BlockAllInGroup(string groupId, string groupLabel)
+    private async Task BlockAllInGroup(IReadOnlyList<BlockedServiceDefinition> services, string groupLabel)
     {
-        if (IsGroupFullyBlocked(groupId))
+        if (IsGroupFullyBlocked(services))
         {
             return;
         }
 
-        foreach (BlockedServiceDefinition service in ServicesInGroup(groupId))
+        foreach (BlockedServiceDefinition service in services)
         {
             BlockedServiceIds.Add(service.Id);
         }
@@ -162,14 +157,14 @@ public partial class BlockedServices : ComponentBase
         await SaveAsync(L["Tous les services du groupe {0} sont bloqués.", L[groupLabel].Value]);
     }
 
-    private async Task UnblockAllInGroup(string groupId, string groupLabel)
+    private async Task UnblockAllInGroup(IReadOnlyList<BlockedServiceDefinition> services, string groupLabel)
     {
-        if (IsGroupFullyAllowed(groupId))
+        if (IsGroupFullyAllowed(services))
         {
             return;
         }
 
-        foreach (BlockedServiceDefinition service in ServicesInGroup(groupId))
+        foreach (BlockedServiceDefinition service in services)
         {
             BlockedServiceIds.Remove(service.Id);
         }
