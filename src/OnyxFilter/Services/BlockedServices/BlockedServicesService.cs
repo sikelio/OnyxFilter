@@ -31,6 +31,9 @@ public sealed class BlockedServicesService : IBlockedServicesService, IDisposabl
     private readonly ILogger<BlockedServicesService> logger;
     private readonly object syncRoot = new object();
 
+    private long reloadGeneration;
+    private long appliedGeneration;
+
     private bool enabled;
     private DnsBlockingMode blockingMode = DnsBlockingMode.Default;
     private string customBlockingIpv4 = string.Empty;
@@ -54,8 +57,11 @@ public sealed class BlockedServicesService : IBlockedServicesService, IDisposabl
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
+        long generation = Interlocked.Increment(ref reloadGeneration);
+
         AppLocalSettings settings = await settingsStore.LoadAsync();
-        ApplySettingsSnapshot(settings);
+
+        ApplySettingsSnapshot(settings, generation);
     }
 
     public bool TryBuildBlockResponse(byte[] query, out byte[]? response, out string? matchedServiceName)
@@ -172,10 +178,13 @@ public sealed class BlockedServicesService : IBlockedServicesService, IDisposabl
 
     private async Task ReloadSettingsAsync()
     {
+        long generation = Interlocked.Increment(ref reloadGeneration);
+
         try
         {
             AppLocalSettings settings = await settingsStore.LoadAsync();
-            ApplySettingsSnapshot(settings);
+
+            ApplySettingsSnapshot(settings, generation);
         }
         catch (Exception ex)
         {
@@ -183,7 +192,7 @@ public sealed class BlockedServicesService : IBlockedServicesService, IDisposabl
         }
     }
 
-    private void ApplySettingsSnapshot(AppLocalSettings settings)
+    private void ApplySettingsSnapshot(AppLocalSettings settings, long generation)
     {
         HashSet<string> newDomains = new HashSet<string>(StringComparer.Ordinal);
         Dictionary<string, string> newDomainToServiceName = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -205,6 +214,12 @@ public sealed class BlockedServicesService : IBlockedServicesService, IDisposabl
 
         lock (syncRoot)
         {
+            if (generation < appliedGeneration)
+            {
+                return;
+            }
+
+            appliedGeneration = generation;
             enabled = settings.General.BlockDomainsWithFilters;
             blockingMode = settings.Dns.BlockingMode;
             customBlockingIpv4 = settings.Dns.CustomBlockingIpv4;
