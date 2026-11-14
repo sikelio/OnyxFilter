@@ -239,21 +239,21 @@ public partial class BlockedServices : ComponentBase
             hasAnyDay = true;
         }
 
-        Schedule = hasAnyDay ? newSchedule : null;
-        BlockedServicesSchedule? scheduleSnapshot = Schedule;
+        BlockedServicesSchedule? scheduleToSave = hasAnyDay ? newSchedule : null;
 
         try
         {
-            await SettingsStore.UpdateAsync(settings => settings.BlockedServices.Schedule = scheduleSnapshot);
-            
+            await SettingsStore.UpdateAsync(settings => settings.BlockedServices.Schedule = scheduleToSave);
+
+            Schedule = scheduleToSave;
+            ShowScheduleDialog = false;
+
             ToastService.Show(L["Horaire de suspension enregistré."], ToastSeverity.Success);
         }
         catch (Exception ex)
         {
             ToastService.Show(L["Erreur lors de l'enregistrement : {0}", ex.Message], ToastSeverity.Error);
         }
-
-        ShowScheduleDialog = false;
     }
 
     private static TimeOnly MinutesToTimeOnly(int minutes)
